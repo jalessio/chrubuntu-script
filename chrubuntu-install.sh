@@ -236,15 +236,6 @@ echo -e "\n127.0.1.1       chrubuntu" >> /tmp/urfs/etc/hosts
 #ff02::1 ip6-allnodes
 #ff02::2 ip6-allrouters" > /tmp/urfs/etc/hosts
 
-cr_install="wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-add-apt-repository \"deb http://dl.google.com/linux/chrome/deb/ stable main\"
-apt-get update
-apt-get -y install google-chrome-stable"
-if [ $ubuntu_arch = 'armhf' ]
-then
-  cr_install='apt-get -y install chromium-browser'
-fi
-
 add_apt_repository_package='software-properties-common'
 ubuntu_major_version=${ubuntu_version:0:2}
 ubuntu_minor_version=${ubuntu_version:3:2}
@@ -264,7 +255,6 @@ add-apt-repository restricted
 add-apt-repository multiverse 
 apt-get update
 apt-get -y install $ubuntu_metapackage
-$cr_install
 if [ -f /usr/lib/lightdm/lightdm-set-defaults ]
 then
   /usr/lib/lightdm/lightdm-set-defaults --autologin user
