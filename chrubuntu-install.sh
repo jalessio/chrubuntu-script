@@ -7,6 +7,7 @@
 #
 # EXAMPLES:
 #   sudo bash chrubuntu-install.sh ubuntu-standard 12.04.5
+#   sudo bash chrubuntu-install.sh ubuntu-standard 12.04.4
 #   sudo bash chrubuntu-install.sh ubuntu-standard lts
 
 # Exit immediately if a command exits with a non-zero status.
@@ -245,7 +246,6 @@ then
 fi
 
 echo -e "apt-get -y update
-apt-get -y dist-upgrade
 apt-get -y install ubuntu-minimal
 apt-get -y install wget
 apt-get -y install $add_apt_repository_package
