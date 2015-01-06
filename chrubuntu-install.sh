@@ -1,23 +1,3 @@
-#!/bin/bash
-#
-# Script to install Ubuntu on Chromebooks
-# 
-# Copyright 2012-2013 Jay Lee
-#
-# here would be nice to have some license - BSD one maybe
-#
-
-# make sure that we have root permissions
-if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root" 1>&2
-   exit 1
-fi
-
-if [ ! $BASH_VERSION ];then
-  echo "This script must be run in bash"
-  exit 1
-fi
-
 # fw_type will always be developer for Mario.
 # Alex and ZGB need the developer BIOS installed though.
 fw_type="`crossystem mainfw_type`"
@@ -65,23 +45,21 @@ else
   ckern_size="`cgpt show -i 6 -n -s -q ${target_disk}`"
   croot_size="`cgpt show -i 7 -n -s -q ${target_disk}`"
   state_size="`cgpt show -i 1 -n -s -q ${target_disk}`"
-  stateful_start="`cgpt show -i 1 -n -b -q ${target_disk}`"
-  broot_start="`cgpt show -i 5 -n -b -q ${target_disk}`"
 
-  max_ubuntu_size=$((($broot_start-$stateful_start)/1024/1024/2))
+  max_ubuntu_size=$(($state_size/1024/1024/2))
   rec_ubuntu_size=$(($max_ubuntu_size - 1))
   # If KERN-C and ROOT-C are one, we partition, otherwise assume they're what they need to be...
-  if [ "$ckern_size" =  "1" -o "$croot_size" = "1" -o "$1" = "repart" ]
+  if [ "$ckern_size" =  "1" -o "$croot_size" = "1" ]
   then
     while :
     do
       read -p "Enter the size in gigabytes you want to reserve for Ubuntu. Acceptable range is 5 to $max_ubuntu_size  but $rec_ubuntu_size is the recommended maximum: " ubuntu_size
-      if [ ! $ubuntu_size -ne -1 2>/dev/null ]
+      if [ ! $ubuntu_size -ne 0 2>/dev/null ]
       then
         echo -e "\n\nNumbers only please...\n\n"
         continue
       fi
-      if [ $ubuntu_size -lt 0 -o $ubuntu_size -gt $max_ubuntu_size ]
+      if [ $ubuntu_size -lt 5 -o $ubuntu_size -gt $max_ubuntu_size ]
       then
         echo -e "\n\nThat number is out of range. Enter a number 5 through $max_ubuntu_size\n\n"
         continue
@@ -90,20 +68,17 @@ else
     done
     # We've got our size in GB for ROOT-C so do the math...
 
-    if [ "$ubuntu_size" = "0" ]
-    then
-      rootc_size=1
-      kernc_size=1
-    else
-      #calculate sector size for rootc
-      rootc_size=$(($ubuntu_size*1024*1024*2))
+    #calculate sector size for rootc
+    rootc_size=$(($ubuntu_size*1024*1024*2))
 
-      #kernc is always 16mb
-      kernc_size=32768
-    fi
+    #kernc is always 16mb
+    kernc_size=32768
 
     #new stateful size with rootc and kernc subtracted from original
-    stateful_size=$((($broot_start - $stateful_start) - $rootc_size - $kernc_size))
+    stateful_size=$(($state_size - $rootc_size - $kernc_size))
+
+    #start stateful at the same spot it currently starts at
+    stateful_start="`cgpt show -i 1 -n -b -q ${target_disk}`"
 
     #start kernc at stateful start plus stateful size
     kernc_start=$(($stateful_start + $stateful_size))
@@ -112,25 +87,20 @@ else
     rootc_start=$(($kernc_start + $kernc_size))
 
     #Do the real work
-    
+
     echo -e "\n\nModifying partition table to make room for Ubuntu." 
     echo -e "Your Chromebook will reboot, wipe your data and then"
     echo -e "you should re-run this script..."
     umount -f /mnt/stateful_partition
-    
-    # kill old parts
-    cgpt add -i 1 -t unused ${target_disk}
-    cgpt add -i 6 -t unused ${target_disk}
-    cgpt add -i 7 -t unused ${target_disk}
-    
+
     # stateful first
-    cgpt add -i 1 -b $stateful_start -s $stateful_size -t data -l STATE ${target_disk}
+    cgpt add -i 1 -b $stateful_start -s $stateful_size -l STATE ${target_disk}
 
     # now kernc
-    cgpt add -i 6 -b $kernc_start -s $kernc_size -t kernel -l KERN-C ${target_disk}
+    cgpt add -i 6 -b $kernc_start -s $kernc_size -l KERN-C ${target_disk}
 
     # finally rootc
-    cgpt add -i 7 -b $rootc_start -s $rootc_size -t rootfs -l ROOT-C ${target_disk}
+    cgpt add -i 7 -b $rootc_start -s $rootc_size -l ROOT-C ${target_disk}
 
     reboot
     exit
@@ -224,23 +194,34 @@ mount -t ext4 ${target_rootfs} /tmp/urfs
 tar_file="http://cdimage.ubuntu.com/ubuntu-core/releases/$ubuntu_version/release/ubuntu-core-$ubuntu_version-core-$ubuntu_arch.tar.gz"
 if [ $ubuntu_version = "dev" ]
 then
-  ubuntu_codename=`wget --quiet -O - http://changelogs.ubuntu.com/meta-release-development | grep "^Dist: " | tail -1 | sed -r 's/^Dist: (.*)$/\1/'`
-  ubuntu_version=`wget --quiet -O - http://changelogs.ubuntu.com/meta-release-development | grep "^Version:" | tail -1 | sed -r 's/^Version: ([^ ]+)( LTS)?$/\1/'`
-  tar_file="http://cdimage.ubuntu.com/ubuntu-core/daily/current/$ubuntu_codename-core-$ubuntu_arch.tar.gz"
+  ubuntu_animal=`wget --quiet -O - http://changelogs.ubuntu.com/meta-release-development | grep "^Dist: " | tail -1 | sed -r 's/^Dist: (.*)$/\1/'`
+  tar_file="http://cdimage.ubuntu.com/ubuntu-core/daily/current/$ubuntu_animal-core-$ubuntu_arch.tar.gz"
 fi
-
-# convert $ubuntu_version from 13.04 to 1304
-ubuntu_version=`echo $ubuntu_version | sed -e 's/\.//g'`
-
-wget -O - $tar_file | tar xzp -C /tmp/urfs/
+wget -O - $tar_file | tar xzvvp -C /tmp/urfs/
 
 mount -o bind /proc /tmp/urfs/proc
 mount -o bind /dev /tmp/urfs/dev
 mount -o bind /dev/pts /tmp/urfs/dev/pts
 mount -o bind /sys /tmp/urfs/sys
 
+if [ -f /usr/bin/old_bins/cgpt ]
+then
+  cp /usr/bin/old_bins/cgpt /tmp/urfs/usr/bin/
+else
+  cp /usr/bin/cgpt /tmp/urfs/usr/bin/
+fi
+
+chmod a+rx /tmp/urfs/usr/bin/cgpt
 cp /etc/resolv.conf /tmp/urfs/etc/
 echo chrubuntu > /tmp/urfs/etc/hostname
+#echo -e "127.0.0.1       localhost
+echo -e "\n127.0.1.1       chrubuntu" >> /tmp/urfs/etc/hosts
+# The following lines are desirable for IPv6 capable hosts
+#::1     localhost ip6-localhost ip6-loopback
+#fe00::0 ip6-localnet
+#ff00::0 ip6-mcastprefix
+#ff02::1 ip6-allnodes
+#ff02::2 ip6-allrouters" > /tmp/urfs/etc/hosts
 
 cr_install="wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
 add-apt-repository \"deb http://dl.google.com/linux/chrome/deb/ stable main\"
@@ -252,16 +233,14 @@ then
 fi
 
 add_apt_repository_package='software-properties-common'
-if [ $ubuntu_version -lt 1210 ]
+ubuntu_major_version=${ubuntu_version:0:2}
+ubuntu_minor_version=${ubuntu_version:3:2}
+if [ $ubuntu_major_version -le 12 ] && [ $ubuntu_minor_version -lt 10 ]
 then
   add_apt_repository_package='python-software-properties'
 fi
 
-echo -e "useradd -m user
-echo user | echo user:user | chpasswd
-adduser user adm
-adduser user sudo
-apt-get -y update
+echo -e "apt-get -y update
 apt-get -y dist-upgrade
 apt-get -y install ubuntu-minimal
 apt-get -y install wget
@@ -271,91 +250,29 @@ add-apt-repository universe
 add-apt-repository restricted
 add-apt-repository multiverse 
 apt-get update
-apt-get -y install libnss-myhostname $ubuntu_metapackage
+apt-get -y install $ubuntu_metapackage
 $cr_install
 if [ -f /usr/lib/lightdm/lightdm-set-defaults ]
 then
   /usr/lib/lightdm/lightdm-set-defaults --autologin user
-fi" > /tmp/urfs/install-ubuntu.sh
+fi
+useradd -m user -s /bin/bash
+echo user | echo user:user | chpasswd
+adduser user adm
+adduser user sudo" > /tmp/urfs/install-ubuntu.sh
 
 chmod a+x /tmp/urfs/install-ubuntu.sh
 chroot /tmp/urfs /bin/bash -c /install-ubuntu.sh
 rm /tmp/urfs/install-ubuntu.sh
 
-# Keep CrOS partitions from showing/mounting in Ubuntu
-udev_target=${target_disk:5}
-echo -e "KERNEL==\"$udev_target1\" ENV{UDISKS_IGNORE}=\"1\"
-KERNEL==\"$udev_target3\" ENV{UDISKS_IGNORE}=\"1\"
-KERNEL==\"$udev_target5\" ENV{UDISKS_IGNORE}=\"1\"
-KERNEL==\"$udev_target8\" ENV{UDISKS_IGNORE}=\"1\"" > /tmp/urfs/etc/udev/rules.d/99-hide-disks.rules
-
-if [ $ubuntu_version -lt 1304 ] # pre-raring
+KERN_VER=`uname -r`
+mkdir -p /tmp/urfs/lib/modules/$KERN_VER/
+cp -ar /lib/modules/$KERN_VER/* /tmp/urfs/lib/modules/$KERN_VER/
+if [ ! -d /tmp/urfs/lib/firmware/ ]
 then
-	if [ -f /usr/bin/old_bins/cgpt ]
-	then
-		cp -p /usr/bin/old_bins/cgpt /tmp/urfs/usr/bin/
-	else
-		cp -p /usr/bin/cgpt /tmp/urfs/usr/bin/
-	fi
-else
-	echo "apt-get -y --force-yes install cgpt vboot-kernel-utils" >/tmp/urfs/install-ubuntu.sh
-
-	if [ $ubuntu_arch = "armhf" ]
-	then
-		cat > /tmp/urfs/usr/share/X11/xorg.conf.d/exynos5.conf <<EOZ
-Section "Device"
-        Identifier      "Mali FBDEV"
-        Driver          "armsoc"
-        Option          "fbdev"                 "/dev/fb0"
-        Option          "Fimg2DExa"             "false"
-        Option          "DRI2"                  "true"
-        Option          "DRI2_PAGE_FLIP"        "false"
-        Option          "DRI2_WAIT_VSYNC"       "true"
-#       Option          "Fimg2DExaSolid"        "false"
-#       Option          "Fimg2DExaCopy"         "false"
-#       Option          "Fimg2DExaComposite"    "false"
-        Option          "SWcursorLCD"           "false"
-EndSection
-Section "Screen"
-        Identifier      "DefaultScreen"
-        Device          "Mali FBDEV"
-        DefaultDepth    24
-EndSection
-EOZ
-                cat > /tmp/urfs/usr/share/X11/xorg.conf.d/touchpad.conf <<EOZ
-Section "InputClass"
-        Identifier "touchpad"
-        MatchIsTouchpad "on"
-        Option "FingerHigh" "5"
-        Option "FingerLow" "5"
-EndSection
-EOZ
-		echo "apt-get -y install --no-install-recommends linux-image-chromebook xserver-xorg-video-armsoc" >>/tmp/urfs/install-ubuntu.sh
-
-		# valid for raring, so far also for saucy but will change
-		kernel=/tmp/urfs/boot/vmlinuz-3.4.0-5-chromebook
-	fi
-
-	chmod a+x /tmp/urfs/install-ubuntu.sh
-	chroot /tmp/urfs /bin/bash -c /install-ubuntu.sh
-	rm /tmp/urfs/install-ubuntu.sh
+  mkdir /tmp/urfs/lib/firmware/
 fi
-
-# we do not have kernel for x86 chromebooks in archive at all
-# and ARM one only in 13.04 and later
-if [ $ubuntu_arch != "armhf" -o $ubuntu_version -lt 1304 ]
-then
-	KERN_VER=`uname -r`
-	mkdir -p /tmp/urfs/lib/modules/$KERN_VER/
-	cp -ar /lib/modules/$KERN_VER/* /tmp/urfs/lib/modules/$KERN_VER/
-	if [ ! -d /tmp/urfs/lib/firmware/ ]
-	then
-	  mkdir /tmp/urfs/lib/firmware/
-	fi
-	cp -ar /lib/firmware/* /tmp/urfs/lib/firmware/
-
-	kernel=/boot/vmlinuz-`uname -r`
-fi
+cp -ar /lib/firmware/* /tmp/urfs/lib/firmware/
 
 echo "console=tty1 debug verbose root=${target_rootfs} rootwait rw lsm.module_locking=0" > kernel-config
 vbutil_arch="x86"
@@ -363,15 +280,18 @@ if [ $ubuntu_arch = "armhf" ]
 then
   vbutil_arch="arm"
 fi
-vbutil_kernel --pack newkern \
+
+current_rootfs="`rootdev -s`"
+current_kernfs_num=$((${current_rootfs: -1:1}-1))
+current_kernfs=${current_rootfs: 0:-1}$current_kernfs_num
+
+vbutil_kernel --repack ${target_kern} \
+    --oldblob $current_kernfs \
     --keyblock /usr/share/vboot/devkeys/kernel.keyblock \
     --version 1 \
     --signprivate /usr/share/vboot/devkeys/kernel_data_key.vbprivk \
     --config kernel-config \
-    --vmlinuz $kernel \
     --arch $vbutil_arch
-
-dd if=newkern of=${target_kern} bs=4M
 
 #Set Ubuntu kernel partition as top priority for next boot (and next boot only)
 cgpt add -i 6 -P 5 -T 1 ${target_disk}
