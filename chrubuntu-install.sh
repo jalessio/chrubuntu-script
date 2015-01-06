@@ -1,3 +1,17 @@
+#!/bin/bash
+
+#
+# Script to install Ubuntu on Chromebooks
+# - Original instructions @ http://chromeos-cr48.blogspot.co.uk/2013/05/chrubuntu-one-script-to-rule-them-all_31.html
+# - Original source of script @ http://goo.gl/s9ryd
+#
+# EXAMPLES:
+#   sudo bash chrubuntu-install.sh ubuntu-standard 12.04.5
+#   sudo bash chrubuntu-install.sh ubuntu-standard lts
+
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
 # fw_type will always be developer for Mario.
 # Alex and ZGB need the developer BIOS installed though.
 fw_type="`crossystem mainfw_type`"
@@ -31,13 +45,12 @@ if [ "$3" != "" ]; then
 
   ext_size="`blockdev --getsz ${target_disk}`"
   aroot_size=$((ext_size - 65600 - 33))
-  parted --script ${target_disk} "mktable gpt"
   cgpt create ${target_disk} 
   cgpt add -i 6 -b 64 -s 32768 -S 1 -P 5 -l KERN-A -t "kernel" ${target_disk}
   cgpt add -i 7 -b 65600 -s $aroot_size -l ROOT-A -t "rootfs" ${target_disk}
   sync
   blockdev --rereadpt ${target_disk}
-  partprobe ${target_disk}
+  partx -a ${target_disk}
   crossystem dev_boot_usb=1
 else
   target_disk="`rootdev -d -s`"
