@@ -36,6 +36,22 @@ Samples I have run successfully on a [Samsung Chromebook 2](http://www.chromium.
     sudo bash chrubuntu-install.sh ubuntu-standard 12.04.5 /dev/mmcblk1
     sudo bash chrubuntu-install.sh ubuntu-standard 14.04 /dev/mmcblk1
 
+### Toggle booting between Chrome OS and ChrUbuntu:
+I have placed to helper scripts on the system to help with toggling between Chrome OS and ChrUbuntu. The following two commands should be available in your path.
+
+To boot into Chrome OS by default:
+    
+    sudo boot2chromeos
+
+To boot into ChrUbuntu by default:
+
+    sudo boot2chrubuntu
+
+The full path to the scripts is:
+
+    /usr/local/bin/boot2chromeos
+    /usr/local/bin/boot2chrubuntu
+
 ---
 ### Here's a (slightly modified) copy of [original documentation]((http://chromeos-cr48.blogspot.co.uk/2013/05/chrubuntu-one-script-to-rule-them-all_31.html):):
 
