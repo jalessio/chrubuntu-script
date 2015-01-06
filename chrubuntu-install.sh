@@ -299,18 +299,27 @@ vbutil_kernel --repack ${target_kern} \
 #Set Ubuntu kernel partition as top priority for next boot (and next boot only)
 cgpt add -i 6 -P 5 -T 1 ${target_disk}
 
+# Add helper scripts to toggle what OS the Chromebook boots by default
+echo "sudo cgpt add -i 6 -P 0 -S 0 ${target_disk}" > /usr/local/sbin/boot2chromeos; chmod +x /usr/local/sbin/boot2chromeos
+echo "sudo cgpt add -i 6 -P 5 -S 1 ${target_disk}" > /usr/local/sbin/boot2chrubuntu; chmod +x /usr/local/sbin/boot2chrubuntu
+
 echo -e "
 
 Installation seems to be complete. If ChrUbuntu fails when you reboot,
 power off your Chrome OS device and then turn it back on. You'll be back
-in Chrome OS. If you're happy with ChrUbuntu when you reboot be sure to run:
+in Chrome OS. If you're happy with ChrUbuntu and want it to be your default
+boot option be sure to run:
 
-sudo cgpt add -i 6 -P 5 -S 1 ${target_disk}
+  boot2chrubuntu
 
-To make it the default boot option. The ChrUbuntu login is:
+To revert back to booting into Chrome OS run:
 
-Username:  user
-Password:  user
+  boot2chromeos
+
+The ChrUbuntu login is:
+
+  Username:  user
+  Password:  user
 
 We're now ready to start ChrUbuntu!
 "
