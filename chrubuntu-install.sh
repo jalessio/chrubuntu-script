@@ -300,8 +300,8 @@ vbutil_kernel --repack ${target_kern} \
 cgpt add -i 6 -P 5 -T 1 ${target_disk}
 
 # Add helper scripts to toggle what OS the Chromebook boots by default
-echo "sudo cgpt add -i 6 -P 0 -S 0 ${target_disk}" > /usr/local/sbin/boot2chromeos; chmod +x /usr/local/sbin/boot2chromeos
-echo "sudo cgpt add -i 6 -P 5 -S 1 ${target_disk}" > /usr/local/sbin/boot2chrubuntu; chmod +x /usr/local/sbin/boot2chrubuntu
+echo "sudo cgpt add -i 6 -P 0 -S 0 ${target_disk}" > /tmp/urfs/usr/local/sbin/boot2chromeos; chmod +x /tmp/urfs/usr/local/sbin/boot2chromeos
+echo "sudo cgpt add -i 6 -P 5 -S 1 ${target_disk}" > /tmp/urfs/usr/local/sbin/boot2chrubuntu; chmod +x /tmp/urfs/usr/local/sbin/boot2chrubuntu
 
 echo -e "
 
